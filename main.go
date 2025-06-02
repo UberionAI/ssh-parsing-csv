@@ -2,29 +2,53 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/ssh"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
 
-	//Getting server connection variables from file .env
+	//Getting server connection variables from file .env and flags
 	if err := godotenv.Load(".env"); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 	sshUsername := os.Getenv("SSH_USERNAME")
 	sshPassword := os.Getenv("SSH_PASSWORD")
 	sshSudoPassword := os.Getenv("SSH_SUDO_PASSWORD")
-	hostname := os.Getenv("HOSTNAME")
+	hostname := os.Getenv("SSH_HOSTNAME")
+
+	//Set flags
+	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
+
+	//Parsing flags
+	flag.Parse()
 
 	if sshUsername == "" || sshPassword == "" || sshSudoPassword == "" {
 		log.Fatal("SSH_USERNAME or SSH_PASSWORD or SSH_SUDO_PASSWORD environment variables not set")
 	}
-	//fmt.Println(sshUsername, sshPassword, sshSudoPassword)
 
+	var commands []string
+	if *commandsFlag != "" {
+		initCommands := strings.Split(*commandsFlag, ",") //separate string commands with ","
+		for _, cmd := range initCommands {
+			cmd = strings.TrimSpace(cmd)
+			prepareCommand := fmt.Sprintf("echo '%s' | sudo -S %s", sshSudoPassword, cmd)
+			commands = append(commands, prepareCommand)
+		}
+	}
+
+	//fmt.Println(sshUsername, sshPassword, sshSudoPassword)
+	//
+	//if *commandsFlag == "" {
+	//	log.Println("No commands to run")
+	//}
+
+	//SSH connection config
 	config := &ssh.ClientConfig{
 		User: sshUsername,
 		Auth: []ssh.AuthMethod{
@@ -32,31 +56,53 @@ func main() {
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
+
+	//Connection stage
 	client, err := ssh.Dial("tcp", hostname, config)
 	if err != nil {
 		log.Fatalf("Error creating connection: %v", err)
 	}
 	defer client.Close()
 
-	//Simple one command for host
-	command := []string{
-		fmt.Sprintf("echo '%s' | sudo -S iptables -L -n -v --line-numbers", sshSudoPassword),
-	}
+	for _, cmd := range commands {
+		session, err := client.NewSession()
+		if err != nil {
+			log.Fatalf("Error creating session: %v", err)
+			continue
+		}
+		defer session.Close()
 
-	//New session is creating
-	session, err := client.NewSession()
-	if err != nil {
-		log.Fatalf("Error creating session: %v", err)
-	}
-	defer session.Close()
-	for _, cmd := range command {
 		var stdoutBuf, stderrBuf bytes.Buffer
 		session.Stdout = &stdoutBuf
 		session.Stderr = &stderrBuf
-		err = session.Run(cmd)
-		if err != nil {
-			log.Fatalf("Error running command: %s, \n%v, \n%s", cmd, err, stderrBuf)
+
+		if err := session.Run(cmd); err != nil {
+			//log.Printf("Error running command: %s: %v, stderr: %s", cmd, err, stderrBuf.String())
+			log.Printf("Error running command: %s, stderr: %s", *commandsFlag, stderrBuf.String())
+			continue
 		}
-		fmt.Println("The result: \n", string(stdoutBuf.Bytes()))
+
+		////Simple one command for host
+		//command := []string{
+		//	fmt.Sprintf("echo '%s' | sudo -S iptables -L -n -v --line-numbers", sshSudoPassword),
+		//}
+		//
+		////New session is creating
+		//session, err := client.NewSession()
+		//if err != nil {
+		//	log.Fatalf("Error creating session: %v", err)
+		//}
+		//defer session.Close()
+		//for _, cmd := range command {
+		//	var stdoutBuf, stderrBuf bytes.Buffer
+		//	session.Stdout = &stdoutBuf
+		//	session.Stderr = &stderrBuf
+		//	err = session.Run(cmd)
+		//	if err != nil {
+		//		log.Fatalf("Error running command: %s, \n%v, \n%s", cmd, err, stderrBuf.String())
+		//	}
+
+		//Resulting output including commands and errors
+		fmt.Printf("Input command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", hostname, *commandsFlag, stdoutBuf.String())
 	}
 }
