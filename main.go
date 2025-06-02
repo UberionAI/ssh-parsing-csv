@@ -42,13 +42,6 @@ func main() {
 		}
 	}
 
-	//fmt.Println(sshUsername, sshPassword, sshSudoPassword)
-	//
-	//if *commandsFlag == "" {
-	//	log.Println("No commands to run")
-	//}
-
-	//SSH connection config
 	config := &ssh.ClientConfig{
 		User: sshUsername,
 		Auth: []ssh.AuthMethod{
@@ -81,26 +74,6 @@ func main() {
 			log.Printf("Error running command: %s, stderr: %s", *commandsFlag, stderrBuf.String())
 			continue
 		}
-
-		////Simple one command for host
-		//command := []string{
-		//	fmt.Sprintf("echo '%s' | sudo -S iptables -L -n -v --line-numbers", sshSudoPassword),
-		//}
-		//
-		////New session is creating
-		//session, err := client.NewSession()
-		//if err != nil {
-		//	log.Fatalf("Error creating session: %v", err)
-		//}
-		//defer session.Close()
-		//for _, cmd := range command {
-		//	var stdoutBuf, stderrBuf bytes.Buffer
-		//	session.Stdout = &stdoutBuf
-		//	session.Stderr = &stderrBuf
-		//	err = session.Run(cmd)
-		//	if err != nil {
-		//		log.Fatalf("Error running command: %s, \n%v, \n%s", cmd, err, stderrBuf.String())
-		//	}
 
 		//Resulting output including commands and errors
 		fmt.Printf("Input command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", hostname, *commandsFlag, stdoutBuf.String())
