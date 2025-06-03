@@ -17,18 +17,32 @@ func main() {
 	if err := godotenv.Load(".env"); err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	sshUsername := os.Getenv("SSH_USERNAME")
-	sshPassword := os.Getenv("SSH_PASSWORD")
-	sshSudoPassword := os.Getenv("SSH_SUDO_PASSWORD")
-	hostname := os.Getenv("SSH_HOSTNAME")
+	//Structure from SSH settings
+	type SettingsSSH struct {
+		Username     string
+		Password     string
+		SudoPassword string
+		Hostname     string
+	}
+
+	SSHpreset := SettingsSSH{
+		Username:     os.Getenv("SSH_USERNAME"),
+		Password:     os.Getenv("SSH_PASSWORD"),
+		SudoPassword: os.Getenv("SSH_SUDO_PASSWORD"),
+		Hostname:     os.Getenv("SSH_HOSTNAME"),
+	}
+	//sshUsername := os.Getenv("SSH_USERNAME")
+	//sshPassword := os.Getenv("SSH_PASSWORD")
+	//sshSudoPassword := os.Getenv("SSH_SUDO_PASSWORD")
+	//hostname := os.Getenv("SSH_HOSTNAME")
 
 	//Set flags
 	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
 
 	//Parsing flags
 	flag.Parse()
-
-	if sshUsername == "" || sshPassword == "" || sshSudoPassword == "" {
+	fmt.Println(SSHpreset.Hostname, SSHpreset.Username, SSHpreset.Password, SSHpreset.SudoPassword)
+	if SSHpreset.Hostname == "" || SSHpreset.Password == "" || SSHpreset.SudoPassword == "" {
 		log.Fatal("SSH_USERNAME or SSH_PASSWORD or SSH_SUDO_PASSWORD environment variables not set")
 	}
 
@@ -37,21 +51,21 @@ func main() {
 		initCommands := strings.Split(*commandsFlag, ",") //separate string commands with ","
 		for _, cmd := range initCommands {
 			cmd = strings.TrimSpace(cmd)
-			prepareCommand := fmt.Sprintf("echo '%s' | sudo -S %s", sshSudoPassword, cmd)
+			prepareCommand := fmt.Sprintf("echo '%s' | sudo -S %s", SSHpreset.SudoPassword, cmd)
 			commands = append(commands, prepareCommand)
 		}
 	}
 
 	config := &ssh.ClientConfig{
-		User: sshUsername,
+		User: SSHpreset.Username,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(sshPassword),
+			ssh.Password(SSHpreset.Password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	//Connection stage
-	client, err := ssh.Dial("tcp", hostname, config)
+	client, err := ssh.Dial("tcp", SSHpreset.Hostname, config)
 	if err != nil {
 		log.Fatalf("Error creating connection: %v", err)
 	}
@@ -76,6 +90,7 @@ func main() {
 		}
 
 		//Resulting output including commands and errors
-		fmt.Printf("Input command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", hostname, *commandsFlag, stdoutBuf.String())
+		fmt.Printf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", SSHpreset.Hostname, *commandsFlag, stdoutBuf.String())
+
 	}
 }
