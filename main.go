@@ -31,10 +31,6 @@ func main() {
 		SudoPassword: os.Getenv("SSH_SUDO_PASSWORD"),
 		Hostname:     os.Getenv("SSH_HOSTNAME"),
 	}
-	//sshUsername := os.Getenv("SSH_USERNAME")
-	//sshPassword := os.Getenv("SSH_PASSWORD")
-	//sshSudoPassword := os.Getenv("SSH_SUDO_PASSWORD")
-	//hostname := os.Getenv("SSH_HOSTNAME")
 
 	//Set flags
 	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
