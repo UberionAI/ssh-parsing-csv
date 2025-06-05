@@ -84,12 +84,11 @@ func main() {
 		csvBuf := bytes.NewBuffer(stdoutBuf.Bytes())
 		err = saveStdoutBuf("csv_output", csvBuf)
 		if err != nil {
-			log.Printf("Error saving stdout: %v", err)
+			log.Printf("Error saving stdout from command: %v", err)
 		}
-		fmt.Printf("Successfully saved output into a csv!")
-
+		continue
 	}
-
+	log.Println("Successfully saved all output into a csv!")
 }
 
 // Function for saving results into a csv file
@@ -104,7 +103,7 @@ func saveStdoutBuf(dir string, stdoutBuf *bytes.Buffer) error {
 
 	timestamp := time.Now().Format("20060102150405")
 	filename := filepath.Join(dir, "ResultOut_"+timestamp+".csv")
-	file, err := os.Create(filename)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Errorf("Error creating file: %v", err)
 	}
