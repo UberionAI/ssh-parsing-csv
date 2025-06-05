@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/ssh"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -76,6 +79,46 @@ func main() {
 		}
 
 		//Resulting output including commands and errors
-		fmt.Printf("Input command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", hostname, *commandsFlag, stdoutBuf.String())
+		//fmt.Printf("Input command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", hostname, *commandsFlag, stdoutBuf.String())
+
+		csvBuf := bytes.NewBuffer(stdoutBuf.Bytes())
+		err = saveStdoutBuf("csv_output", csvBuf)
+		if err != nil {
+			log.Printf("Error saving stdout: %v", err)
+		}
+		fmt.Printf("Successfully saved output into a csv!")
+
 	}
+
+}
+
+// Function for saving results into a csv file
+func saveStdoutBuf(dir string, stdoutBuf *bytes.Buffer) error {
+	if len(stdoutBuf.Bytes()) == 0 {
+		fmt.Errorf("stdoutbuf is empty, file will not be created!")
+	}
+
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		fmt.Errorf("Error creating directory %s: %v", dir, err)
+	}
+
+	timestamp := time.Now().Format("20060102150405")
+	filename := filepath.Join(dir, "ResultOut_"+timestamp+".csv")
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Errorf("Error creating file: %v", err)
+	}
+	defer file.Close()
+
+	//csv-writer
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	//bytes to string
+
+	txt := stdoutBuf.String()
+	if err := writer.Write([]string{txt}); err != nil {
+		fmt.Errorf("Error writing to file: %v", err)
+	}
+	return err
 }
