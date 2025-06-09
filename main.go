@@ -34,6 +34,7 @@ func main() {
 
 	//Set flags
 	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
+	nameFileFlag := flag.String("name", "output.txt", "Name for a file")
 
 	//Parsing flags
 	flag.Parse()
@@ -66,7 +67,8 @@ func main() {
 	}
 	defer client.Close()
 
-	file, err := os.Create("output.txt")
+	//Name for saving file (default name is "output.txt")
+	file, err := os.Create(*nameFileFlag)
 	if err != nil {
 		log.Fatal(err, "Error creating file.")
 	}
@@ -91,7 +93,7 @@ func main() {
 
 		//Resulting output including commands and errors
 		outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", SSHpreset.Hostname, *commandsFlag, stdoutBuf.String())
-		file, err = os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(*nameFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal(err, "Error appending to file.")
 		}
@@ -103,4 +105,5 @@ func main() {
 			log.Fatal(err, "Error formating .txt file")
 		}
 	}
+	fmt.Printf("Successfully created file %s!\n", *nameFileFlag)
 }
