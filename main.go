@@ -31,17 +31,12 @@ func main() {
 		SudoPassword: os.Getenv("SSH_SUDO_PASSWORD"),
 		Hostname:     os.Getenv("SSH_HOSTNAME"),
 	}
-	//sshUsername := os.Getenv("SSH_USERNAME")
-	//sshPassword := os.Getenv("SSH_PASSWORD")
-	//sshSudoPassword := os.Getenv("SSH_SUDO_PASSWORD")
-	//hostname := os.Getenv("SSH_HOSTNAME")
 
 	//Set flags
 	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
 
 	//Parsing flags
 	flag.Parse()
-	fmt.Println(SSHpreset.Hostname, SSHpreset.Username, SSHpreset.Password, SSHpreset.SudoPassword)
 	if SSHpreset.Hostname == "" || SSHpreset.Password == "" || SSHpreset.SudoPassword == "" {
 		log.Fatal("SSH_USERNAME or SSH_PASSWORD or SSH_SUDO_PASSWORD environment variables not set")
 	}
@@ -71,6 +66,11 @@ func main() {
 	}
 	defer client.Close()
 
+	file, err := os.Create("output.txt")
+	if err != nil {
+		log.Fatal(err, "Error creating file.")
+	}
+
 	for _, cmd := range commands {
 		session, err := client.NewSession()
 		if err != nil {
@@ -90,7 +90,17 @@ func main() {
 		}
 
 		//Resulting output including commands and errors
-		fmt.Printf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", SSHpreset.Hostname, *commandsFlag, stdoutBuf.String())
+		outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", SSHpreset.Hostname, *commandsFlag, stdoutBuf.String())
+		file, err = os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal(err, "Error appending to file.")
+		}
+		defer file.Close()
 
+		//Formating new lines to .txt file
+		_, err = fmt.Fprintf(file, "%s\n", outputStr)
+		if err != nil {
+			log.Fatal(err, "Error formating .txt file")
+		}
 	}
 }
