@@ -132,7 +132,7 @@ func main() {
 			}
 
 			//Resulting output including commands and errors
-			outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", ipHost, *commandsFlag, stdoutBuf.String())
+			outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", ipHost, cmd, stdoutBuf.String())
 
 			//Formating new lines to .txt file
 			if _, err := fmt.Fprintf(file, "%s\n", outputStr); err != nil {
