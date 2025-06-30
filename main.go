@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -10,6 +11,9 @@ import (
 	"os"
 	"strings"
 )
+
+// Slice with list of VM ip
+var ipList []string
 
 func main() {
 
@@ -38,8 +42,40 @@ func main() {
 
 	//Parsing flags
 	flag.Parse()
-	if SSHpreset.Hostname == "" || SSHpreset.Password == "" || SSHpreset.SudoPassword == "" {
+	if SSHpreset.Username == "" || SSHpreset.Password == "" || SSHpreset.SudoPassword == "" {
 		log.Fatal("SSH_USERNAME or SSH_PASSWORD or SSH_SUDO_PASSWORD environment variables not set")
+	}
+
+	if _, err := os.Stat("VM_ListSSH.txt"); err == nil {
+		file, err := os.Open("VM_ListSSH.txt")
+		if err != nil {
+			log.Fatal(err, "Can't read a file VM_ListSSH.txt with hostnames ")
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			ip := strings.TrimSpace(scanner.Text())
+			if ip != "" {
+				ipList = append(ipList, ip)
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Fatal(err, "Can't read a file VM_ListSSH.txt")
+		}
+		fmt.Println("Scanned Ip addresses from .txt file are below:")
+		for _, ip := range ipList {
+			fmt.Printf("%s\n", ip)
+		}
+		//another case - using the environment hostname
+	} else if os.IsNotExist(err) {
+		if SSHpreset.Hostname == "" {
+			log.Fatal("Hostname not found in .env")
+		}
+		ipList = append(ipList, SSHpreset.Hostname)
+		fmt.Printf("Hostname %s found in .env file\n", SSHpreset.Hostname)
+	} else {
+		log.Fatal(err, "error checking a file VM_ListSSH.txt: ", err)
 	}
 
 	var commands []string
@@ -60,49 +96,48 @@ func main() {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	//Connection stage
-	client, err := ssh.Dial("tcp", SSHpreset.Hostname, config)
+	file, err := os.OpenFile(*nameFileFlag, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("Error creating connection: %v", err)
+		log.Fatal("Error creating or opening file: ", err)
 	}
-	defer client.Close()
+	defer file.Close()
 
-	//Name for saving file (default name is "output.txt")
-	file, err := os.Create(*nameFileFlag)
-	if err != nil {
-		log.Fatal(err, "Error creating file.")
-	}
-
-	for _, cmd := range commands {
-		session, err := client.NewSession()
+	//Checking cycle to parse all the ip addresses from .txt file
+	for _, ipHost := range ipList {
+		addr := fmt.Sprintf("%s:22", ipHost)
+		//Connection stage
+		client, err := ssh.Dial("tcp", addr, config)
 		if err != nil {
-			log.Fatalf("Error creating session: %v", err)
+			log.Fatalf("Error creating connection with %s: %v", ipHost, err)
 			continue
 		}
-		defer session.Close()
+		defer client.Close()
 
-		var stdoutBuf, stderrBuf bytes.Buffer
-		session.Stdout = &stdoutBuf
-		session.Stderr = &stderrBuf
+		for _, cmd := range commands {
+			session, err := client.NewSession()
+			if err != nil {
+				log.Fatalf("Error creating session for %s: %v", ipHost, err)
+				continue
+			}
+			defer session.Close()
 
-		if err := session.Run(cmd); err != nil {
-			//log.Printf("Error running command: %s: %v, stderr: %s", cmd, err, stderrBuf.String())
-			log.Printf("Error running command: %s, stderr: %s", *commandsFlag, stderrBuf.String())
-			continue
-		}
+			var stdoutBuf, stderrBuf bytes.Buffer
+			session.Stdout = &stdoutBuf
+			session.Stderr = &stderrBuf
 
-		//Resulting output including commands and errors
-		outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", SSHpreset.Hostname, *commandsFlag, stdoutBuf.String())
-		file, err = os.OpenFile(*nameFileFlag, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal(err, "Error appending to file.")
-		}
-		defer file.Close()
+			if err := session.Run(cmd); err != nil {
+				//log.Printf("Error running command: %s: %v, stderr: %s", cmd, err, stderrBuf.String())
+				log.Printf("Error running command: %s, stderr: %s", *commandsFlag, stderrBuf.String())
+				continue
+			}
 
-		//Formating new lines to .txt file
-		_, err = fmt.Fprintf(file, "%s\n", outputStr)
-		if err != nil {
-			log.Fatal(err, "Error formating .txt file")
+			//Resulting output including commands and errors
+			outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", ipHost, *commandsFlag, stdoutBuf.String())
+
+			//Formating new lines to .txt file
+			if _, err := fmt.Fprintf(file, "%s\n", outputStr); err != nil {
+				log.Fatal("Error formating and writing the output into for hostname %s .txt file: %v", ipHost, err)
+			}
 		}
 	}
 	fmt.Printf("Successfully created file %s!\n", *nameFileFlag)
