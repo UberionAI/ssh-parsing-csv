@@ -1,0 +1,8 @@
+#  this file just demonstrates an example list with VM to formating output ssh commands - VM_ListSSH.txt contents
+#   Below just IP address (!example!)
+174.190.150.5
+174.190.150.6
+174.190.150.7
+174.190.150.8
+174.190.150.9
+174.190.150.10
