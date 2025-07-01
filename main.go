@@ -16,12 +16,12 @@ import (
 var ipList []string
 
 func main() {
-
-	//Getting server connection variables from file .env and flags
+	// Getting server connection variables from file .env and flags
 	if err := godotenv.Load(".env"); err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	//Structure from SSH settings
+
+	// Structure from SSH settings
 	type SettingsSSH struct {
 		Username     string
 		Password     string
@@ -36,16 +36,18 @@ func main() {
 		Hostname:     os.Getenv("SSH_HOSTNAME"),
 	}
 
-	//Set flags
+	// Set flags
 	commandsFlag := flag.String("commands", "", "Comma separated list of commands to run")
+	commandFileFlag := flag.String("command-file", "", "Path to file containing commands to run (one per line)")
 	nameFileFlag := flag.String("name", "output.txt", "Name for a file")
 
-	//Parsing flags
+	// Parsing flags
 	flag.Parse()
 	if SSHpreset.Username == "" || SSHpreset.Password == "" || SSHpreset.SudoPassword == "" {
 		log.Fatal("SSH_USERNAME or SSH_PASSWORD or SSH_SUDO_PASSWORD environment variables not set")
 	}
 
+	// Load IP addresses (existing code)
 	if _, err := os.Stat("VM_ListSSH.txt"); err == nil {
 		file, err := os.Open("VM_ListSSH.txt")
 		if err != nil {
@@ -67,7 +69,6 @@ func main() {
 		for _, ip := range ipList {
 			fmt.Printf("%s\n", ip)
 		}
-		//another case - using the environment hostname
 	} else if os.IsNotExist(err) {
 		if SSHpreset.Hostname == "" {
 			log.Fatal("Hostname not found in .env")
@@ -79,13 +80,44 @@ func main() {
 	}
 
 	var commands []string
-	if *commandsFlag != "" {
-		initCommands := strings.Split(*commandsFlag, ",") //separate string commands with ","
+
+	// Load commands from file if specified
+	if *commandFileFlag != "" {
+		file, err := os.Open(*commandFileFlag)
+		if err != nil {
+			log.Fatal("Error opening command file: ", err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			cmd := strings.TrimSpace(scanner.Text())
+			if cmd != "" {
+				commands = append(commands, cmd)
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Fatal("Error reading command file: ", err)
+		}
+		fmt.Printf("Loaded %d commands from file\n", len(commands))
+	}
+
+	// If no command file, use commands from flag
+	if *commandsFlag != "" && len(commands) == 0 {
+		initCommands := strings.Split(*commandsFlag, ";") // separate string commands with ";"
 		for _, cmd := range initCommands {
 			cmd = strings.TrimSpace(cmd)
-			prepareCommand := fmt.Sprintf("echo '%s' | sudo -S %s", SSHpreset.SudoPassword, cmd)
-			commands = append(commands, prepareCommand)
+			if cmd != "" {
+				commands = append(commands, cmd)
+			}
 		}
+	}
+
+	// Prepare commands with sudo
+	var preparedCommands []string
+	for _, cmd := range commands {
+		prepareCommand := fmt.Sprintf("echo '%s' | sudo -S %s", SSHpreset.SudoPassword, cmd)
+		preparedCommands = append(preparedCommands, prepareCommand)
 	}
 
 	config := &ssh.ClientConfig{
@@ -102,21 +134,21 @@ func main() {
 	}
 	defer file.Close()
 
-	//Checking cycle to parse all the ip addresses from .txt file
+	// Checking cycle to parse all the ip addresses from .txt file
 	for _, ipHost := range ipList {
 		addr := fmt.Sprintf("%s:22", ipHost)
-		//Connection stage
+		// Connection stage
 		client, err := ssh.Dial("tcp", addr, config)
 		if err != nil {
-			log.Fatalf("Error creating connection with %s: %v", ipHost, err)
+			log.Printf("Error creating connection with %s: %v", ipHost, err)
 			continue
 		}
 		defer client.Close()
 
-		for _, cmd := range commands {
+		for _, cmd := range preparedCommands {
 			session, err := client.NewSession()
 			if err != nil {
-				log.Fatalf("Error creating session for %s: %v", ipHost, err)
+				log.Printf("Error creating session for %s: %v", ipHost, err)
 				continue
 			}
 			defer session.Close()
@@ -126,17 +158,17 @@ func main() {
 			session.Stderr = &stderrBuf
 
 			if err := session.Run(cmd); err != nil {
-				//log.Printf("Error running command: %s: %v, stderr: %s", cmd, err, stderrBuf.String())
-				log.Printf("Error running command: %s, stderr: %s", *commandsFlag, stderrBuf.String())
+				log.Printf("Error running command: %s, stderr: %s", cmd, stderrBuf.String())
 				continue
 			}
 
-			//Resulting output including commands and errors
-			outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n", ipHost, *commandsFlag, stdoutBuf.String())
+			// Resulting output including commands and errors
+			outputStr := fmt.Sprintf("____________________________\nInput command for host %s: %s\n____________________________\nTHE RESULT:\n%s\n",
+				ipHost, cmd, stdoutBuf.String())
 
-			//Formating new lines to .txt file
+			// Formating new lines to .txt file
 			if _, err := fmt.Fprintf(file, "%s\n", outputStr); err != nil {
-				log.Fatal("Error formating and writing the output into for hostname %s .txt file: %v", ipHost, err)
+				log.Printf("Error writing output for hostname %s: %v", ipHost, err)
 			}
 		}
 	}
