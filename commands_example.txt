@@ -1,0 +1,3 @@
+#All commands must be written
+#An example commands.txt contents below
+printf "CPU: $(nproc) потоков ($(lscpu | awk '/Core.s. per socket/{cores=$4} /Socket.s./{sockets=$2} END{print cores*sockets " ядер"}'))\nRAM: $(free -h | awk '/Mem:/{print "всего=" $2 ", используется=" $3}') \nДиски:\n$(lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT | grep -v "loop")\nОбщий объём: $(lsblk -b | awk '/disk/{sum+=$4} END{print sum/1024/1024/1024 " GiB"}')"
