@@ -3,7 +3,7 @@
 This Go tool lets you run any console commands on virtual machines (VMs) via SSH and save their output to a text file. Want to collect metrics about CPU, RAM, or disks, or check network configurations like routing tables or firewall rules? This project makes it quick and easy! It’s perfect for system administrators who need to automate tasks on servers.
 
 ## What’s it for?
-We use **ssh-parsing-txt** at work to run commands on VMs, such as:
+Use **ssh-parsing-txt** at work to run commands on VMs, such as:
 - Collecting metrics: CPU, RAM, and disk usage (e.g., `lsblk`, `df -h`).
 - Checking network configurations: viewing routes, firewall rules, or network interfaces (e.g., `ip route`, `iptables -L -n -v`).  
 The output of all commands is saved to a file, making it great for analysis, reporting, or debugging.
@@ -17,7 +17,7 @@ The output of all commands is saved to a file, making it great for analysis, rep
 - A text editor for configuring files.
 
 ## Step 1: Deployment
-Here’s how to set up the project on your computer:
+Here’s how to set up the project:
 
 1. **Install Go**:
    - Download Go
